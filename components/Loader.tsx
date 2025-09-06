@@ -8,9 +8,9 @@ interface LoaderProps {
 
 const Loader: React.FC<LoaderProps> = ({ message }) => {
   return (
-    <div className="flex flex-col items-center justify-center p-8 bg-gray-800/50 rounded-lg">
-      <LoadingSpinner className="w-12 h-12 text-cyan-400" />
-      <p className="mt-4 text-lg text-gray-300 font-semibold tracking-wide">{message}</p>
+    <div className="flex flex-col items-center justify-center p-8 border border-gray-300 bg-gray-50">
+      <LoadingSpinner className="w-8 h-8 text-gray-600 animate-spin" />
+      <p className="mt-4 text-xs text-gray-600 font-mono uppercase tracking-wide">{message}</p>
     </div>
   );
 };

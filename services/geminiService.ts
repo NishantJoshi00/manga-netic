@@ -54,6 +54,9 @@ const storyboardSchema = {
 
 
 export const generateStoryboard = async (chapterText: string): Promise<InputStrip[]> => {
+    console.log('[STORYBOARD] Starting storyboard generation...');
+    console.log(`[STORYBOARD] Chapter text length: ${chapterText.length} characters`);
+    
     const system_prompt = `
 You are an expert manga creator. Transform the provided chapter text into multiple appealing and creative manga strips with consistent characters and visual flow across the entire chapter.
 
@@ -128,6 +131,7 @@ OUTPUT REQUIREMENTS:
 Focus on creating a complete manga chapter with multiple strips that are coherent, character-consistent, and professionally structured with detailed character actions throughout.
     `;
 
+    console.log('[STORYBOARD] Calling Gemini API for storyboard generation...');
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [
@@ -139,11 +143,19 @@ Focus on creating a complete manga chapter with multiple strips that are coheren
         },
     });
 
+    console.log('[STORYBOARD] Received storyboard response from Gemini API');
     const jsonText = response.text;
+    console.log(`[STORYBOARD] Response length: ${jsonText.length} characters`);
+    
     try {
-        return JSON.parse(jsonText) as InputStrip[];
+        const parsedResult = JSON.parse(jsonText) as InputStrip[];
+        console.log(`[STORYBOARD] Generated ${parsedResult.length} manga strips`);
+        console.log(`[STORYBOARD] Found characters: ${[...new Set(parsedResult.flatMap(s => s.characters || []))].join(', ')}`);
+        const totalPanels = parsedResult.reduce((acc, strip) => acc + strip.panels.length, 0);
+        console.log(`[STORYBOARD] Total panels created: ${totalPanels}`);
+        return parsedResult;
     } catch (e) {
-        console.error("Failed to parse storyboard as JSON:", jsonText);
+        console.error("[STORYBOARD] Failed to parse storyboard as JSON:", jsonText);
         throw new Error("The AI returned an invalid storyboard format.");
     }
 };
@@ -154,6 +166,10 @@ export const generatePanelImage = async (
   characters: Character[],
   panelCharacters?: CharacterAction[]
 ): Promise<string> => {
+
+  console.log('[PANEL] Starting panel image generation...');
+  console.log(`[PANEL] Panel description: ${panelDescription.substring(0, 100)}...`);
+  console.log(`[PANEL] Characters in panel: ${panelCharacters?.map(c => c.name).join(', ') || 'None'}`);
 
   const characterActions = panelCharacters?.map(c => `- ${c.name}: ${c.description}`).join('\n') || 'No specific character actions described.';
 
@@ -178,6 +194,11 @@ export const generatePanelImage = async (
       }
     }));
 
+  const charactersWithImages = characters.filter(c => c.base64Image && c.mimeType);
+  console.log(`[PANEL] Using ${charactersWithImages.length} character reference images`);
+  console.log(`[PANEL] Using ${characters.length - charactersWithImages.length} generated character descriptions`);
+  console.log('[PANEL] Calling Gemini API for image generation...');
+
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image-preview',
     contents: {
@@ -188,13 +209,17 @@ export const generatePanelImage = async (
     },
   });
 
+  console.log('[PANEL] Received image response from Gemini API');
+  
   for (const part of response.candidates[0].content.parts) {
     if (part.inlineData) {
       const { data, mimeType } = part.inlineData;
+      console.log(`[PANEL] Generated image: ${mimeType}, size: ${Math.round(data.length / 1024)}KB`);
       return `data:${mimeType};base64,${data}`;
     }
   }
 
+  console.error('[PANEL] Image generation failed: No image data in response');
   throw new Error("Image generation failed: The AI did not return an image.");
 };
 
@@ -214,6 +239,10 @@ export const generateCharacterDesigns = async (
   characterNames: string[],
   storyContext: string
 ): Promise<{name: string, description: string}[]> => {
+  console.log('[CHARACTER] Starting character design generation...');
+  console.log(`[CHARACTER] Designing characters: ${characterNames.join(', ')}`);
+  console.log(`[CHARACTER] Story context length: ${storyContext.length} characters`);
+  
   const prompt = `
     Based on the following story context, create a consistent visual description for each character listed.
     The description should be detailed enough for an artist to draw them, including appearance, clothing, and general demeanor.
@@ -224,6 +253,7 @@ export const generateCharacterDesigns = async (
     Characters to design: ${characterNames.join(', ')}
   `;
 
+  console.log('[CHARACTER] Calling Gemini API for character design generation...');
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
@@ -233,11 +263,19 @@ export const generateCharacterDesigns = async (
     },
   });
 
+  console.log('[CHARACTER] Received character design response from Gemini API');
   const jsonText = response.text;
+  console.log(`[CHARACTER] Character design response length: ${jsonText.length} characters`);
+  
   try {
-      return JSON.parse(jsonText) as {name: string, description: string}[];
+      const parsedResult = JSON.parse(jsonText) as {name: string, description: string}[];
+      console.log(`[CHARACTER] Successfully generated designs for ${parsedResult.length} characters`);
+      parsedResult.forEach(char => {
+        console.log(`[CHARACTER] ${char.name}: ${char.description.substring(0, 80)}...`);
+      });
+      return parsedResult;
   } catch (e) {
-      console.error("Failed to parse character designs as JSON:", jsonText);
+      console.error("[CHARACTER] Failed to parse character designs as JSON:", jsonText);
       throw new Error("The AI returned an invalid character design format.");
   }
 };

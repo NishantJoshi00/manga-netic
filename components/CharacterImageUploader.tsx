@@ -39,7 +39,7 @@ const CharacterCard: React.FC<{
     };
 
     return (
-        <div className="bg-gray-700 p-4 rounded-lg flex items-center gap-4">
+        <div className="bg-white border border-gray-300 p-4 flex items-center gap-4">
             <input
                 type="file"
                 accept="image/*"
@@ -49,18 +49,18 @@ const CharacterCard: React.FC<{
                 id={`upload-${character.name}`}
             />
             {character.previewUrl ? (
-                <div className="relative w-20 h-20">
-                    <img src={character.previewUrl} alt={character.name} className="w-full h-full object-cover rounded-full" />
-                    <button onClick={onImageRemove} className="absolute -top-1 -right-1 bg-red-600 rounded-full p-1 text-white hover:bg-red-700">
-                        <TrashIcon className="w-4 h-4" />
+                <div className="relative w-16 h-16">
+                    <img src={character.previewUrl} alt={character.name} className="w-full h-full object-cover border border-gray-300" />
+                    <button onClick={onImageRemove} className="absolute -top-1 -right-1 bg-gray-900 p-1 text-white hover:bg-gray-700 text-xs">
+                        <TrashIcon className="w-3 h-3" />
                     </button>
                 </div>
             ) : (
-                <label htmlFor={`upload-${character.name}`} className="w-20 h-20 flex items-center justify-center bg-gray-800 border-2 border-dashed border-gray-500 rounded-full cursor-pointer hover:border-cyan-400 hover:bg-gray-700">
-                    <UploadIcon className="w-8 h-8 text-gray-400" />
+                <label htmlFor={`upload-${character.name}`} className="w-16 h-16 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-400 cursor-pointer hover:border-gray-600 hover:bg-gray-200">
+                    <UploadIcon className="w-6 h-6 text-gray-500" />
                 </label>
             )}
-            <div className="font-bold text-lg">{character.name}</div>
+            <div className="font-bold text-sm uppercase tracking-wide text-gray-900">{character.name}</div>
         </div>
     );
 };
@@ -92,40 +92,44 @@ const CharacterImageUploader: React.FC<CharacterImageUploaderProps> = ({ charact
     };
 
     return (
-        <div className="w-full max-w-3xl mx-auto bg-gray-800 p-4 rounded-lg shadow-lg">
-            <h3 className="text-xl font-bold text-white mb-4 font-bangers tracking-wide">
-                2. Setup Characters (Optional)
-            </h3>
-            <p className="text-gray-400 mb-4">Upload a reference image for each character. If you don't, the AI will design them based on the story.</p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {characters.map((char) => (
-                    <CharacterCard
-                        key={char.name}
-                        character={char}
-                        onImageUpload={(file) => handleImageUpload(file, char.name)}
-                        onImageRemove={() => handleImageRemove(char.name)}
-                    />
-                ))}
+        <div className="w-full max-w-4xl mx-auto border border-gray-300 bg-gray-50">
+            <div className="border-b border-gray-300 px-6 py-4">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">
+                    02. Character Setup (Optional)
+                </h3>
+                <p className="text-xs text-gray-600 mt-1 uppercase tracking-wide">Upload reference images or let AI design characters</p>
             </div>
+            
+            <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+                    {characters.map((char) => (
+                        <CharacterCard
+                            key={char.name}
+                            character={char}
+                            onImageUpload={(file) => handleImageUpload(file, char.name)}
+                            onImageRemove={() => handleImageRemove(char.name)}
+                        />
+                    ))}
+                </div>
 
-            <div className="flex justify-between items-center mt-4">
-                <button
-                    type="button"
-                    onClick={onBack}
-                    disabled={isLoading}
-                    className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg disabled:bg-gray-700 disabled:cursor-not-allowed"
-                >
-                    <ArrowLeftIcon className="w-5 h-5" />
-                    Back
-                </button>
-                <button
-                    onClick={onGenerate}
-                    disabled={isLoading}
-                    className="bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-3 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
-                >
-                    {isLoading ? 'Creating Your Manga...' : 'Generate Manga'}
-                </button>
+                <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        disabled={isLoading}
+                        className="flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wide text-gray-600 border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <ArrowLeftIcon className="w-4 h-4" />
+                        Back
+                    </button>
+                    <button
+                        onClick={onGenerate}
+                        disabled={isLoading}
+                        className="px-6 py-2 text-xs font-bold uppercase tracking-wide bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isLoading ? 'Generating...' : 'Generate Manga'}
+                    </button>
+                </div>
             </div>
         </div>
     );

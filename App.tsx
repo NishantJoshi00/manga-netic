@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const isLoading = generationState === GenerationState.GENERATING || generationState === GenerationState.GENERATING_STORYBOARD;
 
   const handleChapterSubmit = useCallback(async (text: string) => {
+    console.log('[APP] Chapter submitted, starting storyboard generation');
     setChapterText(text);
     setGenerationState(GenerationState.GENERATING_STORYBOARD);
     setLoadingMessage('Creating storyboard from your chapter...');
@@ -31,9 +32,10 @@ const App: React.FC = () => {
       const allCharacterNames = new Set(strips.flatMap(s => s.characters || []));
       const characterData = Array.from(allCharacterNames).map(name => ({ name }));
       setCharacters(characterData);
+      console.log(`[APP] Storyboard complete. Moving to character setup with ${characterData.length} characters`);
       setGenerationState(GenerationState.CHARACTER_SETUP);
     } catch (err) {
-      console.error(err);
+      console.error('[APP] Storyboard generation failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate storyboard.');
       setGenerationState(GenerationState.INPUT);
     } finally {
@@ -50,6 +52,7 @@ const App: React.FC = () => {
   };
 
   const handleGenerateManga = useCallback(async () => {
+    console.log('[APP] Starting manga generation process');
     setGenerationState(GenerationState.GENERATING);
     setError(null);
     
@@ -58,6 +61,7 @@ const App: React.FC = () => {
       const charsToDesign = characters.filter(c => !c.base64Image);
       
       if (charsToDesign.length > 0) {
+        console.log(`[APP] Need to generate designs for ${charsToDesign.length} characters`);
         setLoadingMessage(`Designing ${charsToDesign.length} character(s)...`);
         const designs = await generateCharacterDesigns(charsToDesign.map(c => c.name), chapterText);
         
@@ -65,12 +69,15 @@ const App: React.FC = () => {
           const foundDesign = designs.find(d => d.name === c.name);
           return foundDesign ? { ...c, generatedDescription: foundDesign.description } : c;
         });
+        console.log('[APP] Character designs complete');
         setCharacters(finalCharacters);
       }
 
+      console.log(`[APP] Starting panel generation for ${inputStrips.length} strips`);
       const stripsToRender: MangaStripData[] = [];
       for (let i = 0; i < inputStrips.length; i++) {
         const strip = inputStrips[i];
+        console.log(`[APP] Processing strip ${i + 1}/${inputStrips.length}: ${strip.description.substring(0, 50)}...`);
         const initialStripData: MangaStripData = {
           description: strip.description,
           panels: strip.panels.map((p, idx) => ({ ...p, panelNumber: idx + 1 }))
@@ -80,17 +87,20 @@ const App: React.FC = () => {
 
         for (let j = 0; j < strip.panels.length; j++) {
           const panel = strip.panels[j];
+          console.log(`[APP] Generating panel ${j + 1}/${strip.panels.length} for strip ${i + 1}`);
           setLoadingMessage(`Drawing strip ${i + 1}, panel ${j + 1}...`);
 
           const imageUrl = await generatePanelImage(panel.description, strip.description, finalCharacters, panel.characters);
 
           stripsToRender[i].panels[j].imageUrl = imageUrl;
+          console.log(`[APP] Panel ${j + 1} of strip ${i + 1} complete`);
           setGeneratedStrips([...stripsToRender]);
         }
       }
+      console.log('[APP] All panels generated successfully. Moving to viewing state');
       setGenerationState(GenerationState.VIEWING);
     } catch (err) {
-      console.error(err);
+      console.error('[APP] Manga generation failed:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
       setGenerationState(GenerationState.CHARACTER_SETUP); // Go back to setup on error
     } finally {
@@ -120,9 +130,9 @@ const App: React.FC = () => {
             />
             {generationState === GenerationState.GENERATING && <Loader message={loadingMessage} />}
             {error && (
-              <div className="bg-red-900/50 border border-red-500 text-red-300 p-4 rounded-lg max-w-2xl w-full my-4">
-                <p className="font-bold">Oh no, something went wrong!</p>
-                <p>{error}</p>
+              <div className="bg-gray-100 border-l-4 border-gray-600 p-4 max-w-2xl w-full my-4">
+                <p className="font-bold text-gray-900 text-sm uppercase tracking-wide">Error</p>
+                <p className="text-gray-700 text-sm mt-1">{error}</p>
               </div>
             )}
             {generatedStrips.map((data, index) => (
@@ -134,21 +144,23 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white p-4 sm:p-8 font-sans">
-      <header className="text-center mb-8">
-        <h1 className="text-5xl sm:text-6xl font-bangers text-cyan-400 tracking-wider [text-shadow:_3px_3px_0_rgb(0_0_0)]">
-          AI Manga Creator
-        </h1>
-        <p className="text-gray-400 mt-2 max-w-2xl mx-auto">
-          Turn your story into a manga. Just paste your chapter, setup your characters, and let the AI do the rest.
-        </p>
-      </header>
-      <main className="flex flex-col items-center gap-8">
-        {renderContent()}
-      </main>
-      <footer className="text-center mt-12 text-gray-500 text-sm">
-        <p>Powered by Google Gemini API</p>
-      </footer>
+    <div className="bg-white min-h-screen text-gray-900 font-mono">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <header className="border-b border-gray-300 pb-8 mb-12">
+          <h1 className="text-4xl font-bold text-gray-900 tracking-tight uppercase">
+            AI Manga Creator
+          </h1>
+          <p className="text-gray-600 mt-3 text-sm uppercase tracking-wide">
+            Transform text into visual narratives
+          </p>
+        </header>
+        <main className="space-y-8">
+          {renderContent()}
+        </main>
+        <footer className="border-t border-gray-300 pt-8 mt-16 text-center">
+          <p className="text-xs text-gray-500 uppercase tracking-wide">Powered by Google Gemini API</p>
+        </footer>
+      </div>
     </div>
   );
 };
