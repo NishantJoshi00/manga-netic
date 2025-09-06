@@ -284,7 +284,7 @@ const App: React.FC = () => {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <header className="border-b border-gray-300 pb-8 mb-12">
           <h1 className="text-4xl font-bold text-gray-900 tracking-tight uppercase">
-            AI Manga Creator
+            Manga-netic
           </h1>
           <p className="text-gray-600 mt-3 text-sm uppercase tracking-wide">
             Transform text into visual narratives
