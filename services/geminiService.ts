@@ -53,7 +53,10 @@ const storyboardSchema = {
 };
 
 
-export const generateStoryboard = async (chapterText: string): Promise<InputStrip[]> => {
+export const generateStoryboard = async (
+    chapterText: string,
+    onProgress?: (chunk: string) => void
+): Promise<InputStrip[]> => {
     console.log('[STORYBOARD] Starting storyboard generation...');
     console.log(`[STORYBOARD] Chapter text length: ${chapterText.length} characters`);
     
@@ -131,32 +134,73 @@ OUTPUT REQUIREMENTS:
 Focus on creating a complete manga chapter with multiple strips that are coherent, character-consistent, and professionally structured with detailed character actions throughout.
     `;
 
-    console.log('[STORYBOARD] Calling Gemini API for storyboard generation...');
-    const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-            { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
-        ],
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: storyboardSchema,
-        },
-    });
-
-    console.log('[STORYBOARD] Received storyboard response from Gemini API');
-    const jsonText = response.text;
-    console.log(`[STORYBOARD] Response length: ${jsonText.length} characters`);
+    console.log('[STORYBOARD] Calling Gemini API for streaming storyboard generation...');
     
-    try {
-        const parsedResult = JSON.parse(jsonText) as InputStrip[];
-        console.log(`[STORYBOARD] Generated ${parsedResult.length} manga strips`);
-        console.log(`[STORYBOARD] Found characters: ${[...new Set(parsedResult.flatMap(s => s.characters || []))].join(', ')}`);
-        const totalPanels = parsedResult.reduce((acc, strip) => acc + strip.panels.length, 0);
-        console.log(`[STORYBOARD] Total panels created: ${totalPanels}`);
-        return parsedResult;
-    } catch (e) {
-        console.error("[STORYBOARD] Failed to parse storyboard as JSON:", jsonText);
-        throw new Error("The AI returned an invalid storyboard format.");
+    if (onProgress) {
+        // Use streaming for progress updates
+        const stream = await ai.models.generateContentStream({
+            model: "gemini-2.5-flash",
+            contents: [
+                { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
+            ],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: storyboardSchema,
+            },
+        });
+
+        console.log('[STORYBOARD] Starting to stream storyboard response...');
+        let fullResponse = '';
+        
+        for await (const chunk of stream) {
+            const chunkText = chunk.text;
+            fullResponse += chunkText;
+            onProgress(chunkText);
+            console.log(`[STORYBOARD] Received chunk: ${chunkText.length} characters`);
+        }
+        
+        console.log('[STORYBOARD] Streaming complete, parsing full response...');
+        console.log(`[STORYBOARD] Full response length: ${fullResponse.length} characters`);
+        
+        try {
+            const parsedResult = JSON.parse(fullResponse) as InputStrip[];
+            console.log(`[STORYBOARD] Generated ${parsedResult.length} manga strips`);
+            console.log(`[STORYBOARD] Found characters: ${[...new Set(parsedResult.flatMap(s => s.characters || []))].join(', ')}`);
+            const totalPanels = parsedResult.reduce((acc, strip) => acc + strip.panels.length, 0);
+            console.log(`[STORYBOARD] Total panels created: ${totalPanels}`);
+            return parsedResult;
+        } catch (e) {
+            console.error("[STORYBOARD] Failed to parse streamed storyboard as JSON:", fullResponse);
+            throw new Error("The AI returned an invalid storyboard format.");
+        }
+    } else {
+        // Fall back to non-streaming for backward compatibility
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+                { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
+            ],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: storyboardSchema,
+            },
+        });
+
+        console.log('[STORYBOARD] Received storyboard response from Gemini API');
+        const jsonText = response.text;
+        console.log(`[STORYBOARD] Response length: ${jsonText.length} characters`);
+        
+        try {
+            const parsedResult = JSON.parse(jsonText) as InputStrip[];
+            console.log(`[STORYBOARD] Generated ${parsedResult.length} manga strips`);
+            console.log(`[STORYBOARD] Found characters: ${[...new Set(parsedResult.flatMap(s => s.characters || []))].join(', ')}`);
+            const totalPanels = parsedResult.reduce((acc, strip) => acc + strip.panels.length, 0);
+            console.log(`[STORYBOARD] Total panels created: ${totalPanels}`);
+            return parsedResult;
+        } catch (e) {
+            console.error("[STORYBOARD] Failed to parse storyboard as JSON:", jsonText);
+            throw new Error("The AI returned an invalid storyboard format.");
+        }
     }
 };
 

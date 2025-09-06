@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [generatedStrips, setGeneratedStrips] = useState<MangaStripData[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [loadingMessage, setLoadingMessage] = useState('');
+  const [streamingContent, setStreamingContent] = useState('');
   const [error, setError] = useState<string | null>(null);
   
   const isLoading = generationState === GenerationState.GENERATING || generationState === GenerationState.GENERATING_STORYBOARD;
@@ -23,11 +24,14 @@ const App: React.FC = () => {
     setChapterText(text);
     setGenerationState(GenerationState.GENERATING_STORYBOARD);
     setLoadingMessage('Creating storyboard from your chapter...');
+    setStreamingContent('');
     setError(null);
     setGeneratedStrips([]);
 
     try {
-      const strips = await generateStoryboard(text);
+      const strips = await generateStoryboard(text, (chunk: string) => {
+        setStreamingContent(prev => prev + chunk);
+      });
       setInputStrips(strips);
       const allCharacterNames = new Set(strips.flatMap(s => s.characters || []));
       const characterData = Array.from(allCharacterNames).map(name => ({ name }));
@@ -40,6 +44,7 @@ const App: React.FC = () => {
       setGenerationState(GenerationState.INPUT);
     } finally {
         setLoadingMessage('');
+        setStreamingContent('');
     }
   }, []);
 
@@ -114,7 +119,7 @@ const App: React.FC = () => {
         return <MangaInput onConfirm={handleChapterSubmit} isLoading={false} />;
       
       case GenerationState.GENERATING_STORYBOARD:
-        return <Loader message={loadingMessage} />;
+        return <Loader message={loadingMessage} streamingContent={streamingContent} />;
 
       case GenerationState.CHARACTER_SETUP:
       case GenerationState.GENERATING:
