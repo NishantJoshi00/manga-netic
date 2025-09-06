@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import type { Character, CharacterAction, InputStrip } from '../types';
+import type { Character, CharacterAction, InputStrip, Panel } from '../types';
 
 if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable is not set");
@@ -72,7 +72,7 @@ CHAPTER-WIDE CONSISTENCY:
 STRIP STRUCTURE REQUIREMENTS:
 - Break the chapter into multiple strips, each containing 3-6 panels for optimal pacing
 - Write a clear strip description for each strip that establishes the scene, setting, and mood
-- Identify and list ALL characters present in each strip for consistency tracking
+- Identify and list ONLY NAMED CHARACTERS present in each strip for consistency tracking
 - Design panels within each strip that work together as a cohesive visual sequence
 
 CHARACTER CONSISTENCY ACROSS STRIPS:
@@ -80,6 +80,13 @@ CHARACTER CONSISTENCY ACROSS STRIPS:
 - Use consistent character names, personalities, and visual traits throughout the chapter
 - Ensure character interactions and relationships remain consistent across all strips
 - Track recurring characters and maintain their established visual characteristics
+
+CHARACTER CLASSIFICATION:
+- ONLY include NAMED CHARACTERS with speaking roles or significant story importance in the characters list
+- DO NOT include background characters, crowds, extras, or unnamed individuals in the characters list
+- Background characters can be mentioned in panel descriptions but should NOT be added to character lists
+- Focus character tracking on main characters, supporting characters, and recurring named individuals
+- Examples of characters to EXCLUDE from lists: "crowd", "passerby", "student #3", "random villager", etc.
 
 INDIVIDUAL STRIP COHERENCE:
 - Each panel description should reference the strip's overall context and setting
@@ -126,10 +133,11 @@ CHARACTER ACTION DETAILS:
 OUTPUT REQUIREMENTS:
 - Generate multiple strips that collectively tell the complete chapter story
 - Provide descriptive strip descriptions that capture each scene's essence
-- List all characters present in each strip consistently
-- For each panel, include detailed CharacterAction descriptions for all characters
+- List ONLY NAMED CHARACTERS present in each strip consistently (exclude background/crowd characters)
+- For each panel, include detailed CharacterAction descriptions for named characters only
 - Ensure character names and descriptions remain identical across all appearances
 - Always specify speakers for dialogue to maintain clear character voice
+- Background characters should be described in panel descriptions but NOT listed in character arrays
 
 Focus on creating a complete manga chapter with multiple strips that are coherent, character-consistent, and professionally structured with detailed character actions throughout.
     `;
@@ -153,10 +161,12 @@ Focus on creating a complete manga chapter with multiple strips that are coheren
         let fullResponse = '';
         
         for await (const chunk of stream) {
-            const chunkText = chunk.text;
-            fullResponse += chunkText;
-            onProgress(chunkText);
-            console.log(`[STORYBOARD] Received chunk: ${chunkText.length} characters`);
+            const chunkText = chunk.text || '';
+            if (chunkText) {
+                fullResponse += chunkText;
+                onProgress(chunkText);
+                console.log(`[STORYBOARD] Received chunk: ${chunkText.length} characters`);
+            }
         }
         
         console.log('[STORYBOARD] Streaming complete, parsing full response...');
@@ -218,16 +228,26 @@ export const generatePanelImage = async (
   const characterActions = panelCharacters?.map(c => `- ${c.name}: ${c.description}`).join('\n') || 'No specific character actions described.';
 
   const textParts = [
-    { text: `Style: A dynamic black and white manga panel with screentones. Vertical 9:16 aspect ratio. DO NOT add any text, speech bubbles, or titles into the image.` },
-    { text: `Strip Theme: ${stripDescription}` },
-    { text: `Panel Description: ${panelDescription}` },
-    { text: `Character Actions in this Panel:\n${characterActions}` }
+    { text: `IMPORTANT: You MUST generate an image. This is required.
+
+Style: A dynamic black and white manga panel with screentones. Vertical 9:16 aspect ratio. DO NOT add any text, speech bubbles, or titles into the image.
+
+Strip Theme: ${stripDescription}
+
+Panel Description: ${panelDescription}
+
+Character Actions in this Panel:
+${characterActions}
+
+GENERATE A MANGA PANEL IMAGE NOW.` }
   ];
 
   const characterInfo = characters
     .map(c => `- ${c.name}: ${c.generatedDescription || 'Use the provided reference image for this character.'}`)
     .join('\n');
-  textParts.push({ text: `Overall Character Designs:\n${characterInfo}` });
+  if (characterInfo.trim()) {
+    textParts.push({ text: `Overall Character Designs:\n${characterInfo}` });
+  }
   
   const imageParts = characters
     .filter(c => c.base64Image && c.mimeType)
@@ -241,30 +261,58 @@ export const generatePanelImage = async (
   const charactersWithImages = characters.filter(c => c.base64Image && c.mimeType);
   console.log(`[PANEL] Using ${charactersWithImages.length} character reference images`);
   console.log(`[PANEL] Using ${characters.length - charactersWithImages.length} generated character descriptions`);
-  console.log('[PANEL] Calling Gemini API for image generation...');
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image-preview',
-    contents: {
-      parts: [ ...imageParts, ...textParts ],
-    },
-    config: {
-      responseModalities: [Modality.IMAGE, Modality.TEXT],
-    },
-  });
-
-  console.log('[PANEL] Received image response from Gemini API');
   
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      const { data, mimeType } = part.inlineData;
-      console.log(`[PANEL] Generated image: ${mimeType}, size: ${Math.round(data.length / 1024)}KB`);
-      return `data:${mimeType};base64,${data}`;
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      console.log(`[PANEL] Attempt ${attempt}/2 - Calling Gemini API for image generation...`);
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: {
+          parts: [ ...imageParts, ...textParts ],
+        },
+        config: {
+          responseModalities: [Modality.IMAGE, Modality.TEXT],
+        },
+      });
+
+      console.log('[PANEL] Received image response from Gemini API');
+      
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            const { data, mimeType } = part.inlineData;
+            console.log(`[PANEL] Generated image: ${mimeType}, size: ${Math.round(data.length / 1024)}KB`);
+            return `data:${mimeType};base64,${data}`;
+          }
+        }
+      }
+
+      const errorMsg = `Image generation failed: No image data in response (attempt ${attempt}/2)`;
+      console.error(`[PANEL] ${errorMsg}`);
+      lastError = new Error(errorMsg);
+      
+      if (attempt < 2) {
+        console.log('[PANEL] Retrying image generation...');
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+      }
+      
+    } catch (error) {
+      const errorMsg = `Image generation attempt ${attempt}/2 failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error(`[PANEL] ${errorMsg}`);
+      lastError = new Error(errorMsg);
+      
+      if (attempt < 2) {
+        console.log('[PANEL] Retrying after error...');
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+      }
     }
   }
 
-  console.error('[PANEL] Image generation failed: No image data in response');
-  throw new Error("Image generation failed: The AI did not return an image.");
+  console.error('[PANEL] All image generation attempts failed');
+  throw lastError || new Error("Image generation failed after 2 attempts");
 };
 
 const characterSchema = {
@@ -321,5 +369,87 @@ export const generateCharacterDesigns = async (
   } catch (e) {
       console.error("[CHARACTER] Failed to parse character designs as JSON:", jsonText);
       throw new Error("The AI returned an invalid character design format.");
+  }
+};
+
+const narrationSchema = {
+  type: Type.OBJECT,
+  properties: {
+    narrationText: { type: Type.STRING }
+  },
+  required: ['narrationText']
+};
+
+export const generateNarration = async (
+  stripDescription: string,
+  panels: Panel[],
+  characters: string[]
+): Promise<string> => {
+  console.log('[NARRATION] Starting narration generation...');
+  console.log(`[NARRATION] Strip description: ${stripDescription.substring(0, 100)}...`);
+  console.log(`[NARRATION] Characters: ${characters.join(', ')}`);
+  console.log(`[NARRATION] Panels count: ${panels.length}`);
+
+  const panelsText = panels.map((panel, idx) => {
+    const dialogues = panel.text.filter(t => t.type === 'dialogue')
+      .map(t => `${t.speaker}: "${t.content}"`).join('\n');
+    const narrations = panel.text.filter(t => t.type === 'narration')
+      .map(t => t.content).join(' ');
+    const thoughts = panel.text.filter(t => t.type === 'thought')
+      .map(t => `(${t.speaker} thinks: ${t.content})`).join('\n');
+    
+    return `Panel ${idx + 1}:
+Description: ${panel.description}
+Dialogues: ${dialogues || 'None'}
+Narration: ${narrations || 'None'}
+Thoughts: ${thoughts || 'None'}`;
+  }).join('\n\n');
+
+  const prompt = `
+Create an engaging narration script for this manga strip that will be converted to speech.
+
+Strip Overview: ${stripDescription}
+Characters Present: ${characters.join(', ')}
+
+Panel Details:
+${panelsText}
+
+NARRATION REQUIREMENTS:
+- Create a cohesive narration that flows through the entire strip
+- Use ONLY narrator voice - do NOT use any character markup tags
+- Write everything as narrative text from the narrator's perspective
+- Describe character actions, dialogue, and thoughts as part of the story
+- Convert dialogue into narrative form (e.g., "John said he was ready to fight" instead of direct quotes)
+- Include scene descriptions, character actions, and atmosphere
+- Make it engaging for audio listeners who can't see the visuals
+- Keep the total narration under 500 words for optimal audio length
+
+Available voices:
+- Narrator: For all narrative descriptions, scene setting, and story telling
+
+Generate a single flowing narration text that tells the complete story of this strip using only narrator voice.
+`;
+
+  console.log('[NARRATION] Calling Gemini API for narration generation...');
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: narrationSchema,
+    },
+  });
+
+  console.log('[NARRATION] Received narration response from Gemini API');
+  const jsonText = response.text;
+  console.log(`[NARRATION] Narration response length: ${jsonText.length} characters`);
+  
+  try {
+    const parsedResult = JSON.parse(jsonText) as { narrationText: string };
+    console.log(`[NARRATION] Generated narration: ${parsedResult.narrationText.substring(0, 200)}...`);
+    return parsedResult.narrationText;
+  } catch (e) {
+    console.error("[NARRATION] Failed to parse narration as JSON:", jsonText);
+    throw new Error("The AI returned an invalid narration format.");
   }
 };

@@ -19,7 +19,7 @@ const Loader: React.FC<LoaderProps> = ({ message, streamingContent }) => {
 
   return (
     <div className="flex flex-col items-center justify-center p-8 border border-gray-300 bg-gray-50">
-      <LoadingSpinner className="w-8 h-8 text-gray-600 animate-spin" />
+      <LoadingSpinner className="w-8 h-8 text-gray-600 animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
       <p className="mt-4 text-xs text-gray-600 font-mono uppercase tracking-wide">{message}</p>
       
       {streamingContent && (

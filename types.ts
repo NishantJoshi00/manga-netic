@@ -51,4 +51,6 @@ export interface Panel extends InputPanel {
 export interface MangaStripData {
   description: string;
   panels: Panel[];
+  narrationText?: string;
+  audioUrl?: string;
 }
