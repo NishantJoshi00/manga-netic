@@ -5,7 +5,33 @@ if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable is not set");
 }
 
+// Initialize primary and fallback AI clients
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const aiFallback = process.env.GEMINI_API_KEY_FALLBACK ? 
+  new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY_FALLBACK }) : null;
+
+// Helper function to try API call with fallback
+async function callGeminiWithFallback<T>(
+  apiCall: (client: GoogleGenAI) => Promise<T>
+): Promise<T> {
+  try {
+    return await apiCall(ai);
+  } catch (error: any) {
+    console.warn('[GEMINI] Primary API failed, trying fallback:', error.message);
+    
+    if (aiFallback && (
+      error.message?.includes('403') || 
+      error.message?.includes('429') || 
+      error.message?.includes('503') ||
+      error.message?.includes('quota')
+    )) {
+      console.log('[GEMINI] Using fallback API key');
+      return await apiCall(aiFallback);
+    }
+    
+    throw error;
+  }
+}
 
 const textTypeSchema = {
     type: Type.OBJECT,
@@ -137,17 +163,19 @@ Focus on creating a complete manga chapter with multiple strips that are coheren
     console.log('[STORYBOARD] Calling Gemini API for streaming storyboard generation...');
     
     if (onProgress) {
-        // Use streaming for progress updates
-        const stream = await ai.models.generateContentStream({
-            model: "gemini-2.5-flash",
-            contents: [
-                { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
-            ],
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: storyboardSchema,
-            },
-        });
+        // Use streaming for progress updates with fallback
+        const stream = await callGeminiWithFallback(async (client) => 
+            client.models.generateContentStream({
+                model: "gemini-2.5-flash",
+                contents: [
+                    { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
+                ],
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: storyboardSchema,
+                },
+            })
+        );
 
         console.log('[STORYBOARD] Starting to stream storyboard response...');
         let fullResponse = '';
@@ -175,16 +203,18 @@ Focus on creating a complete manga chapter with multiple strips that are coheren
         }
     } else {
         // Fall back to non-streaming for backward compatibility
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: [
-                { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
-            ],
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: storyboardSchema,
-            },
-        });
+        const response = await callGeminiWithFallback(async (client) =>
+            client.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: [
+                    { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
+                ],
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: storyboardSchema,
+                },
+            })
+        );
 
         console.log('[STORYBOARD] Received storyboard response from Gemini API');
         const jsonText = response.text;
@@ -217,11 +247,21 @@ export const generatePanelImage = async (
 
   const characterActions = panelCharacters?.map(c => `- ${c.name}: ${c.description}`).join('\n') || 'No specific character actions described.';
 
+  // Aggressive content sanitization
+  const sanitizeText = (text: string) => {
+    return text
+      .replace(/fight|fighting|battle|battling|attack|attacking|kill|killing|murder|die|dying|death|dead|violence|violent|blood|bloody|gore|weapon|weapons|sword|swords|gun|guns|knife|knives|stab|stabbing|shoot|shooting|hit|hitting|punch|punching|kick|kicking|hurt|hurting|wound|wounded|injury|injured|harm|harming/gi, 'encounter')
+      .replace(/monster|demon|devil|evil|dark|scary|horror|terror|nightmare/gi, 'character')
+      .replace(/angry|furious|rage|enraged|mad|hatred|hate/gi, 'determined')
+      .replace(/scream|screaming|shout|shouting|yell|yelling/gi, 'speak')
+      .replace(/threat|threatening|danger|dangerous|risk|risky/gi, 'challenge');
+  };
+
   const textParts = [
-    { text: `Style: A dynamic black and white manga panel with screentones. Vertical 9:16 aspect ratio. DO NOT add any text, speech bubbles, or titles into the image.` },
-    { text: `Strip Theme: ${stripDescription}` },
-    { text: `Panel Description: ${panelDescription}` },
-    { text: `Character Actions in this Panel:\n${characterActions}` }
+    { text: `Style: A peaceful, wholesome black and white manga panel with screentones. Vertical 9:16 aspect ratio. Completely family-friendly and safe content. Show characters in calm, positive interactions. DO NOT add any text, speech bubbles, or titles into the image. Focus on friendship, dialogue, and everyday activities.` },
+    { text: `Strip Theme: ${sanitizeText(stripDescription)}` },
+    { text: `Panel Description: A calm scene where ${sanitizeText(panelDescription).replace(/statue/gi, 'figure')}` },
+    { text: `Character Actions: Characters are having a peaceful conversation or friendly interaction. ${sanitizeText(characterActions)}` }
   ];
 
   const characterInfo = characters
@@ -243,17 +283,70 @@ export const generatePanelImage = async (
   console.log(`[PANEL] Using ${characters.length - charactersWithImages.length} generated character descriptions`);
   console.log('[PANEL] Calling Gemini API for image generation...');
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image-preview',
-    contents: {
-      parts: [ ...imageParts, ...textParts ],
-    },
-    config: {
-      responseModalities: [Modality.IMAGE, Modality.TEXT],
-    },
-  });
+  const response = await callGeminiWithFallback(async (client) =>
+    client.models.generateContent({
+      model: 'gemini-2.5-flash-image-preview',
+      contents: [
+        { role: 'user', parts: [ ...imageParts, ...textParts ] }
+      ],
+      config: {
+        responseModalities: [Modality.IMAGE, Modality.TEXT],
+      },
+    })
+  );
 
   console.log('[PANEL] Received image response from Gemini API');
+  console.log('[PANEL] Response structure:', JSON.stringify(response, null, 2));
+  
+  if (!response.candidates || !response.candidates[0]) {
+    console.error('[PANEL] No candidates in response:', response);
+    throw new Error('Invalid response from Gemini API - no candidates');
+  }
+  
+  const candidate = response.candidates[0];
+  console.log('[PANEL] Candidate structure:', JSON.stringify(candidate, null, 2));
+  
+  // Handle content policy violations
+  if (candidate.finishReason === 'PROHIBITED_CONTENT') {
+    console.warn('[PANEL] Content was flagged as prohibited. Trying with modified prompt...');
+    
+    // Try again with a more conservative prompt
+    const conservativeTextParts = [
+      { text: `Style: A completely wholesome, safe black and white manga panel with screentones. Vertical 9:16 aspect ratio. Show only positive, friendly interactions between characters. DO NOT add any text, speech bubbles, or titles into the image.` },
+      { text: `Scene: Characters having a calm, friendly conversation or meeting` },
+      { text: `Content: A peaceful indoor or outdoor scene with characters talking or interacting positively` },
+      { text: `Character Actions: All characters are smiling, talking calmly, or standing peacefully together` }
+    ];
+    
+    // Retry with conservative prompt
+    const retryResponse = await callGeminiWithFallback(async (client) =>
+      client.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: [
+          { role: 'user', parts: [ ...imageParts, ...conservativeTextParts ] }
+        ],
+        config: {
+          responseModalities: [Modality.IMAGE, Modality.TEXT],
+        },
+      })
+    );
+    
+    if (retryResponse.candidates?.[0]?.content?.parts) {
+      return processValidResponse(retryResponse);
+    } else {
+      throw new Error('Content repeatedly flagged as prohibited. Please try with different story content.');
+    }
+  }
+  
+  if (!candidate.content || !candidate.content.parts) {
+    console.error('[PANEL] Invalid candidate structure:', candidate);
+    throw new Error('Invalid response from Gemini API - missing content or parts');
+  }
+  
+  return processValidResponse(response);
+}
+
+function processValidResponse(response: any): string {
   
   for (const part of response.candidates[0].content.parts) {
     if (part.inlineData) {
@@ -298,14 +391,16 @@ export const generateCharacterDesigns = async (
   `;
 
   console.log('[CHARACTER] Calling Gemini API for character design generation...');
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: characterSchema,
-    },
-  });
+  const response = await callGeminiWithFallback(async (client) =>
+    client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: characterSchema,
+      },
+    })
+  );
 
   console.log('[CHARACTER] Received character design response from Gemini API');
   const jsonText = response.text;

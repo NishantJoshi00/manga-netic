@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Panel, TextBlock } from '../types';
 import { LoadingSpinner } from './icons';
 
@@ -63,10 +63,38 @@ const TextOverlays: React.FC<{ panel: Panel }> = ({ panel }) => {
 };
 
 const MangaPanel: React.FC<MangaPanelProps> = ({ panel }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const isFirstPanelWithMotionPoster = panel.isFirstPanel && panel.motionPosterUrl;
+
   return (
-    <div className="relative w-full aspect-[9/16] bg-gray-200 border border-gray-400 flex items-center justify-center overflow-hidden">
+    <div 
+      className="relative w-full aspect-[9/16] bg-gray-200 border border-gray-400 flex items-center justify-center overflow-hidden"
+      onMouseEnter={() => isFirstPanelWithMotionPoster && setIsHovered(true)}
+      onMouseLeave={() => isFirstPanelWithMotionPoster && setIsHovered(false)}
+    >
       {panel.imageUrl ? (
-        <img src={panel.imageUrl} alt={panel.description} className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500" />
+        <>
+          {/* Static image - always visible */}
+          <img 
+            src={panel.imageUrl} 
+            alt={panel.description} 
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+              isHovered && isFirstPanelWithMotionPoster ? 'opacity-0' : 'opacity-100'
+            }`} 
+          />
+          {/* Motion poster video - only visible on hover for first panels */}
+          {isFirstPanelWithMotionPoster && (
+            <video
+              src={panel.motionPosterUrl}
+              autoPlay
+              muted
+              loop
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+                isHovered ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
+          )}
+        </>
       ) : (
         <div className="flex flex-col items-center animate-pulse">
           <LoadingSpinner className="w-6 h-6 text-gray-500" />
