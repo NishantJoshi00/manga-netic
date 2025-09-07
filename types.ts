@@ -46,13 +46,9 @@ export interface Character {
 export interface Panel extends InputPanel {
   panelNumber: number;
   imageUrl?: string;
-  motionPosterUrl?: string;
-  isFirstPanel?: boolean;
 }
 
 export interface MangaStripData {
   description: string;
   panels: Panel[];
-  narrationText?: string;
-  audioUrl?: string;
 }

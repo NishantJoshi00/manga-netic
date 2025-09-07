@@ -3,9 +3,7 @@ import MangaInput from './components/MangaInput';
 import MangaPage from './components/MangaPage';
 import Loader from './components/Loader';
 import CharacterImageUploader from './components/CharacterImageUploader';
-import { generateCharacterDesigns, generatePanelImage, generateStoryboard, generateNarration } from './services/geminiService';
-import { elevenLabsService } from './services/elevenlabsService';
-import { motionPosterService } from './services/motionPosterService';
+import { generateCharacterDesigns, generatePanelImage, generateStoryboard } from './services/geminiService';
 import type { MangaStripData, Character, InputStrip } from './types';
 import { GenerationState } from './types';
 
@@ -124,43 +122,7 @@ const App: React.FC = () => {
           }
         }
 
-        // If this is the first panel of the first strip only, preload motion poster
-        if (i === 0) {
-          const firstPanelImageUrl = stripsToRender[i].panels[0].imageUrl;
-          if (firstPanelImageUrl) {
-            console.log(`[APP] Preloading motion poster for first panel of first strip`);
-            motionPosterService.preloadMotionPoster(firstPanelImageUrl).then(() => {
-              const result = motionPosterService.getCachedMotionPoster(firstPanelImageUrl);
-              if (result) {
-                stripsToRender[i].panels[0].motionPosterUrl = result.video_url;
-                setGeneratedStrips([...stripsToRender]);
-                console.log(`[APP] Motion poster preloaded for first panel of first strip`);
-              }
-            }).catch(err => {
-              console.warn(`[APP] Failed to preload motion poster for first panel of first strip:`, err);
-            });
-          }
-        }
 
-        console.log(`[APP] Generating narration for strip ${i + 1}...`);
-        setLoadingMessage(`Creating narration for strip ${i + 1}...`);
-        
-        try {
-          const narrationText = await generateNarration(
-            strip.description,
-            strip.panels,
-            strip.characters || []
-          );
-          console.log(`[APP] Narration generated for strip ${i + 1}, creating audio...`);
-          const audioUrl = await elevenLabsService.generateTTS(narrationText);
-          
-          stripsToRender[i].narrationText = narrationText;
-          stripsToRender[i].audioUrl = audioUrl;
-          console.log(`[APP] Strip ${i + 1} narration complete`);
-          setGeneratedStrips([...stripsToRender]);
-        } catch (narrationError) {
-          console.error(`[APP] Failed to generate narration for strip ${i + 1}:`, narrationError);
-        }
       }
       console.log('[APP] All panels generated successfully. Moving to viewing state');
       setGenerationState(GenerationState.VIEWING);
@@ -211,28 +173,6 @@ const App: React.FC = () => {
           }
         }
 
-        // Generate narration for completed strips
-        if (i >= startStripIndex) {
-          console.log(`[APP] Generating narration for strip ${i + 1}...`);
-          setLoadingMessage(`Creating narration for strip ${i + 1}...`);
-          
-          try {
-            const narrationText = await generateNarration(
-              strip.description,
-              strip.panels,
-              strip.characters || []
-            );
-            console.log(`[APP] Narration generated for strip ${i + 1}, creating audio...`);
-            const audioUrl = await elevenLabsService.generateTTS(narrationText);
-            
-            stripsToRender[i].narrationText = narrationText;
-            stripsToRender[i].audioUrl = audioUrl;
-            console.log(`[APP] Strip ${i + 1} narration complete`);
-            setGeneratedStrips([...stripsToRender]);
-          } catch (narrationError) {
-            console.error(`[APP] Failed to generate narration for strip ${i + 1}:`, narrationError);
-          }
-        }
       }
       
       setRetryContext(null);
@@ -309,9 +249,6 @@ const App: React.FC = () => {
           <h1 className="text-4xl font-bold text-gray-900 tracking-tight uppercase">
             Manga-netic
           </h1>
-          <p className="text-gray-600 mt-3 text-sm uppercase tracking-wide">
-            Transform text into visual narratives
-          </p>
         </header>
         <main className="space-y-8">
           {renderContent()}

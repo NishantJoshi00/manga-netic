@@ -2,7 +2,6 @@
 import React from 'react';
 import type { MangaStripData } from '../types';
 import MangaPanel from './MangaPanel';
-import { AudioPlayer } from './AudioPlayer';
 
 interface MangaPageProps {
   data: MangaStripData;
@@ -12,8 +11,6 @@ interface MangaPageProps {
 const MangaPage: React.FC<MangaPageProps> = ({ data, stripNumber }) => {
   return (
     <div className="w-full max-w-lg mx-auto space-y-4">
-      <AudioPlayer audioUrl={data.audioUrl} stripNumber={stripNumber} />
-      
       <div className="bg-white border border-gray-400">
         <div className="border-b border-gray-300 px-4 py-3 bg-gray-100">
           <h1 className="font-mono text-sm font-bold text-gray-900 uppercase tracking-wide text-center">

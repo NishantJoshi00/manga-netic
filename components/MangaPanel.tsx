@@ -46,7 +46,7 @@ const TextOverlays: React.FC<{ panel: Panel }> = ({ panel }) => {
 
   return (
     <>
-      <div className="absolute bottom-2 left-2 right-2 flex flex-col items-start gap-1 pointer-events-none">
+      <div className="absolute top-2 left-2 right-2 flex flex-col items-start gap-1 pointer-events-none">
         {regularText.map((block, index) => (
           <TextBlockOverlay key={index} textBlock={block} />
         ))}
@@ -63,38 +63,14 @@ const TextOverlays: React.FC<{ panel: Panel }> = ({ panel }) => {
 };
 
 const MangaPanel: React.FC<MangaPanelProps> = ({ panel }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const isFirstPanelWithMotionPoster = panel.isFirstPanel && panel.motionPosterUrl;
-
   return (
-    <div 
-      className="relative w-full aspect-[9/16] bg-gray-200 border border-gray-400 flex items-center justify-center overflow-hidden"
-      onMouseEnter={() => isFirstPanelWithMotionPoster && setIsHovered(true)}
-      onMouseLeave={() => isFirstPanelWithMotionPoster && setIsHovered(false)}
-    >
+    <div className="relative w-full aspect-[9/16] bg-gray-200 border border-gray-400 flex items-center justify-center overflow-hidden">
       {panel.imageUrl ? (
-        <>
-          {/* Static image - always visible */}
-          <img 
-            src={panel.imageUrl} 
-            alt={panel.description} 
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-              isHovered && isFirstPanelWithMotionPoster ? 'opacity-0' : 'opacity-100'
-            }`} 
-          />
-          {/* Motion poster video - only visible on hover for first panels */}
-          {isFirstPanelWithMotionPoster && (
-            <video
-              src={panel.motionPosterUrl}
-              autoPlay
-              muted
-              loop
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-                isHovered ? 'opacity-100' : 'opacity-0'
-              }`}
-            />
-          )}
-        </>
+        <img 
+          src={panel.imageUrl} 
+          alt={panel.description} 
+          className="absolute inset-0 w-full h-full object-cover"
+        />
       ) : (
         <div className="flex flex-col items-center animate-pulse">
           <LoadingSpinner className="w-6 h-6 text-gray-500" />
@@ -102,7 +78,7 @@ const MangaPanel: React.FC<MangaPanelProps> = ({ panel }) => {
         </div>
       )}
       {panel.title && (
-         <div className="absolute top-2 left-1/2 -translate-x-1/2 font-mono text-lg font-bold text-white text-center bg-gray-900/80 px-2 py-1 select-none pointer-events-none uppercase tracking-wide">
+         <div className="absolute top-0 left-1/2 -translate-x-1/2 font-mono text-lg font-bold text-white text-center bg-gray-900/80 px-2 py-1 select-none pointer-events-none uppercase tracking-wide">
             {panel.title}
          </div>
       )}

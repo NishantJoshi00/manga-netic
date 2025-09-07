@@ -89,6 +89,17 @@ export const generateStoryboard = async (
     const system_prompt = `
 You are an expert manga creator. Transform the provided chapter text into multiple appealing and creative manga strips with consistent characters and visual flow across the entire chapter.
 
+CRITICAL STORY FIDELITY REQUIREMENTS:
+- You MUST accurately adapt the entire input story without skipping important events, dialogue, or character moments
+- Every significant plot point, character interaction, and story beat from the input text MUST be included in the manga adaptation
+- Preserve the exact sequence of events as they occur in the original story - do not reorder or restructure narrative elements
+- Include ALL meaningful dialogue from the story, ensuring character voices and conversations are faithfully represented
+- Capture the specific emotions, reactions, and character development moments described in the input text
+- If the story describes specific actions, settings, or visual details, these MUST be reflected accurately in panel descriptions
+- Do not add invented scenes, characters, or plot elements that don't exist in the original story
+- Do not omit or compress important story moments - ensure comprehensive coverage of the input narrative
+- The manga adaptation should tell the complete story from beginning to end with full narrative integrity
+
 CHAPTER-WIDE CONSISTENCY:
 - Maintain consistent character descriptions and personalities throughout ALL strips in the chapter
 - Use the same character names and visual descriptions across all strips
@@ -97,9 +108,19 @@ CHAPTER-WIDE CONSISTENCY:
 
 STRIP STRUCTURE REQUIREMENTS:
 - Break the chapter into multiple strips, each containing 3-6 panels for optimal pacing
-- Write a clear strip description for each strip that establishes the scene, setting, and mood
+- Each strip must cover a specific section of the input story chronologically - do not skip ahead or jump around
+- Write a clear strip description for each strip that directly corresponds to the events in that story section
 - Identify and list ONLY NAMED CHARACTERS present in each strip for consistency tracking
 - Design panels within each strip that work together as a cohesive visual sequence
+- Ensure complete coverage: the sum of all strips must tell the entire input story without gaps
+
+PANEL-BY-PANEL STORY ACCURACY:
+- Each panel must represent specific moments, actions, or dialogue from the input story
+- Panel descriptions should directly reflect what is happening in the corresponding part of the story text
+- When dialogue occurs in the story, create panels that show the characters speaking with appropriate context
+- When actions occur in the story, create panels that visually depict those specific actions
+- Maintain temporal flow - panels should follow the story's timeline exactly as written
+- Do not create "filler" panels that don't correspond to actual story content
 
 CHARACTER CONSISTENCY ACROSS STRIPS:
 - When a character appears in multiple strips, maintain their exact visual description
@@ -139,10 +160,25 @@ CHAPTER SEGMENTATION:
 - End strips at compelling moments that encourage reading the next strip
 
 DETAILED PANEL STRUCTURE:
-- For each panel, provide a clear description of the visual scene and composition
+- For each panel, provide a comprehensive description that includes:
+  * Overall scene composition and camera angle (close-up, medium shot, wide shot, bird's eye view, etc.)
+  * Environmental details and background elements that set the scene
+  * Precise character positioning within the panel (foreground, background, left, right, center)
+  * Spatial relationships between characters and their environment
+  * Visual flow and focal points that guide the reader's eye
 - List all characters present in the panel using the CharacterAction structure
-- For each character, specify their name and detailed description of their actions, pose, and expression
-- Use these character actions to inform and enhance the panel description
+- For each character, specify their name and detailed description including:
+  * Exact positioning and orientation within the panel space
+  * Body pose, stance, and posture details
+  * Facial expressions and emotional state
+  * Hand gestures and arm positions
+  * Eye direction and what they're looking at
+  * Interaction with props, environment, or other characters
+- Panel descriptions should reference how characters with uploaded reference images should be drawn:
+  * If a character has a reference image, mention "draw [character name] matching their reference image" 
+  * Specify how the reference image character should be positioned and posed in the current scene
+  * Describe any modifications needed (different clothes, expressions, etc.) while maintaining core appearance
+- Use these character actions and positioning details to create rich, cinematically detailed panel descriptions
 
 TEXT AND DIALOGUE REQUIREMENTS:
 - For all dialogue text, ALWAYS fill in the speaker field with the character's name
@@ -156,16 +192,40 @@ CHARACTER ACTION DETAILS:
 - Specify character positioning and interaction with environment
 - Maintain character appearance consistency across all panels
 
+CHARACTER REFERENCE IMAGE INTEGRATION:
+- When describing panels, assume some characters may have uploaded reference images
+- In panel descriptions, explicitly mention "draw [character name] matching their reference image" for consistency
+- Describe how reference image characters should be positioned, posed, and styled in each specific scene
+- For characters without reference images, provide detailed visual descriptions in CharacterAction
+- Ensure panel descriptions account for both reference image characters and generated character descriptions
+- Reference image characters should maintain their core appearance while adapting to scene requirements
+
 OUTPUT REQUIREMENTS:
 - Generate multiple strips that collectively tell the complete chapter story
 - Provide descriptive strip descriptions that capture each scene's essence
 - List ONLY NAMED CHARACTERS present in each strip consistently (exclude background/crowd characters)
-- For each panel, include detailed CharacterAction descriptions for named characters only
+- For each panel, include comprehensive descriptions with:
+  * Detailed scene composition and camera work
+  * Precise character positioning and spatial relationships
+  * Rich environmental and background details
+  * Clear visual flow and focal points
+- For each panel, include detailed CharacterAction descriptions for named characters only with:
+  * Exact positioning within the panel space
+  * Complete body language, pose, and expression details
+  * Specific interactions with environment and other characters
 - Ensure character names and descriptions remain identical across all appearances
 - Always specify speakers for dialogue to maintain clear character voice
 - Background characters should be described in panel descriptions but NOT listed in character arrays
+- Panel descriptions should be detailed enough for an artist to visualize the exact scene composition
 
 Focus on creating a complete manga chapter with multiple strips that are coherent, character-consistent, and professionally structured with detailed character actions throughout.
+
+FINAL VERIFICATION REQUIREMENTS:
+- Before generating the JSON, ensure every important element of the input story has been included
+- Verify that the manga adaptation tells the complete story from start to finish
+- Check that all key characters, dialogue, actions, and plot points are represented
+- Confirm that the narrative flow matches the original story's sequence and pacing
+- The final manga should be a faithful visual adaptation that captures the full essence and content of the input story
     `;
 
     console.log('[STORYBOARD] Calling Gemini API for streaming storyboard generation...');
@@ -268,9 +328,17 @@ export const generatePanelImage = async (
   };
 
   const textParts = [
-    { text: `IMPORTANT: You MUST generate an image. This is required.
+    { text: `CRITICAL REQUIREMENT: You MUST generate an image. This is required.
 
-Style: A dynamic black and white manga panel with screentones. Vertical 9:16 aspect ratio. DO NOT add any text, speech bubbles, or titles into the image.
+ABSOLUTELY NO TEXT ALLOWED: 
+- DO NOT include ANY text, letters, words, or writing of any kind in the image
+- DO NOT add speech bubbles, dialogue bubbles, thought bubbles, or text balloons
+- DO NOT include sound effects, onomatopoeia, or action words (like "BANG", "POW", etc.)
+- DO NOT add titles, captions, labels, or any written content
+- DO NOT include signs, posters, books, or any readable text elements
+- The image must be purely visual storytelling without any textual elements whatsoever
+
+Style: A dynamic black and white manga panel with screentones. Vertical 9:16 aspect ratio. Focus entirely on visual composition, character expressions, body language, and environmental details to convey the story.
 
 Strip Theme: ${stripDescription}
 
@@ -279,7 +347,7 @@ Panel Description: ${panelDescription}
 Character Actions in this Panel:
 ${characterActions}
 
-GENERATE A MANGA PANEL IMAGE NOW.` }
+GENERATE A COMPLETELY TEXT-FREE MANGA PANEL IMAGE NOW.` }
   ];
 
   const characterInfo = characters
@@ -335,7 +403,15 @@ GENERATE A MANGA PANEL IMAGE NOW.` }
         
         // Try again with a more conservative prompt
         const conservativeTextParts = [
-          { text: `Style: A completely wholesome, safe black and white manga panel with screentones. Vertical 9:16 aspect ratio. Show only positive, friendly interactions between characters. DO NOT add any text, speech bubbles, or titles into the image.` },
+          { text: `ABSOLUTELY NO TEXT ALLOWED: 
+- DO NOT include ANY text, letters, words, or writing of any kind in the image
+- DO NOT add speech bubbles, dialogue bubbles, thought bubbles, or text balloons
+- DO NOT include sound effects, onomatopoeia, or action words
+- DO NOT add titles, captions, labels, or any written content
+- DO NOT include signs, posters, books, or any readable text elements
+- The image must be purely visual storytelling without any textual elements whatsoever
+
+Style: A completely wholesome, safe black and white manga panel with screentones. Vertical 9:16 aspect ratio. Show only positive, friendly interactions between characters.` },
           { text: `Scene: Characters having a calm, friendly conversation or meeting` },
           { text: `Content: A peaceful indoor or outdoor scene with characters talking or interacting positively` },
           { text: `Character Actions: All characters are smiling, talking calmly, or standing peacefully together` }
@@ -466,84 +542,3 @@ export const generateCharacterDesigns = async (
   }
 };
 
-const narrationSchema = {
-  type: Type.OBJECT,
-  properties: {
-    narrationText: { type: Type.STRING }
-  },
-  required: ['narrationText']
-};
-
-export const generateNarration = async (
-  stripDescription: string,
-  panels: Panel[],
-  characters: string[]
-): Promise<string> => {
-  console.log('[NARRATION] Starting narration generation...');
-  console.log(`[NARRATION] Strip description: ${stripDescription.substring(0, 100)}...`);
-  console.log(`[NARRATION] Characters: ${characters.join(', ')}`);
-  console.log(`[NARRATION] Panels count: ${panels.length}`);
-
-  const panelsText = panels.map((panel, idx) => {
-    const dialogues = panel.text.filter(t => t.type === 'dialogue')
-      .map(t => `${t.speaker}: "${t.content}"`).join('\n');
-    const narrations = panel.text.filter(t => t.type === 'narration')
-      .map(t => t.content).join(' ');
-    const thoughts = panel.text.filter(t => t.type === 'thought')
-      .map(t => `(${t.speaker} thinks: ${t.content})`).join('\n');
-    
-    return `Panel ${idx + 1}:
-Description: ${panel.description}
-Dialogues: ${dialogues || 'None'}
-Narration: ${narrations || 'None'}
-Thoughts: ${thoughts || 'None'}`;
-  }).join('\n\n');
-
-  const prompt = `
-Create an engaging narration script for this manga strip that will be converted to speech.
-
-Strip Overview: ${stripDescription}
-Characters Present: ${characters.join(', ')}
-
-Panel Details:
-${panelsText}
-
-NARRATION REQUIREMENTS:
-- Create a cohesive narration that flows through the entire strip
-- Use ONLY narrator voice - do NOT use any character markup tags
-- Write everything as narrative text from the narrator's perspective
-- Describe character actions, dialogue, and thoughts as part of the story
-- Convert dialogue into narrative form (e.g., "John said he was ready to fight" instead of direct quotes)
-- Include scene descriptions, character actions, and atmosphere
-- Make it engaging for audio listeners who can't see the visuals
-- Keep the total narration under 500 words for optimal audio length
-
-Available voices:
-- Narrator: For all narrative descriptions, scene setting, and story telling
-
-Generate a single flowing narration text that tells the complete story of this strip using only narrator voice.
-`;
-
-  console.log('[NARRATION] Calling Gemini API for narration generation...');
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: narrationSchema,
-    },
-  });
-
-  console.log('[NARRATION] Received narration response from Gemini API');
-  const jsonText = response.text;
-  console.log(`[NARRATION] Narration response length: ${jsonText.length} characters`);
-  
-  try {
-    const parsedResult = JSON.parse(jsonText) as { narrationText: string };
-    console.log(`[NARRATION] Generated narration: ${parsedResult.narrationText.substring(0, 200)}...`);
-    return parsedResult.narrationText;
-  } catch (e) {
-    console.error("[NARRATION] Failed to parse narration as JSON:", jsonText);
-    throw new Error("The AI returned an invalid narration format.");
-  }
-};
