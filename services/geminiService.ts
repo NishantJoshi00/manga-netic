@@ -5,33 +5,8 @@ if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable is not set");
 }
 
-// Initialize primary and fallback AI clients
+// Initialize AI client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const aiFallback = process.env.GEMINI_API_KEY_FALLBACK ? 
-  new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY_FALLBACK }) : null;
-
-// Helper function to try API call with fallback
-async function callGeminiWithFallback<T>(
-  apiCall: (client: GoogleGenAI) => Promise<T>
-): Promise<T> {
-  try {
-    return await apiCall(ai);
-  } catch (error: any) {
-    console.warn('[GEMINI] Primary API failed, trying fallback:', error.message);
-    
-    if (aiFallback && (
-      error.message?.includes('403') || 
-      error.message?.includes('429') || 
-      error.message?.includes('503') ||
-      error.message?.includes('quota')
-    )) {
-      console.log('[GEMINI] Using fallback API key');
-      return await apiCall(aiFallback);
-    }
-    
-    throw error;
-  }
-}
 
 const textTypeSchema = {
     type: Type.OBJECT,
@@ -231,19 +206,17 @@ FINAL VERIFICATION REQUIREMENTS:
     console.log('[STORYBOARD] Calling Gemini API for streaming storyboard generation...');
     
     if (onProgress) {
-        // Use streaming for progress updates with fallback
-        const stream = await callGeminiWithFallback(async (client) => 
-            client.models.generateContentStream({
-                model: "gemini-2.5-flash",
-                contents: [
-                    { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
-                ],
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: storyboardSchema,
-                },
-            })
-        );
+        // Use streaming for progress updates
+        const stream = await ai.models.generateContentStream({
+            model: "gemini-2.5-flash",
+            contents: [
+                { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
+            ],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: storyboardSchema,
+            }
+        });
 
         console.log('[STORYBOARD] Starting to stream storyboard response...');
         let fullResponse = '';
@@ -273,18 +246,16 @@ FINAL VERIFICATION REQUIREMENTS:
         }
     } else {
         // Fall back to non-streaming for backward compatibility
-        const response = await callGeminiWithFallback(async (client) =>
-            client.models.generateContent({
-                model: "gemini-2.5-flash",
-                contents: [
-                    { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
-                ],
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema: storyboardSchema,
-                },
-            })
-        );
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+                { role: 'user', parts: [{ text: system_prompt }, { text: chapterText }] }
+            ],
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: storyboardSchema,
+            }
+        });
 
         console.log('[STORYBOARD] Received storyboard response from Gemini API');
         const jsonText = response.text;
@@ -376,17 +347,15 @@ GENERATE A COMPLETELY TEXT-FREE MANGA PANEL IMAGE NOW.` }
     try {
       console.log(`[PANEL] Attempt ${attempt}/2 - Calling Gemini API for image generation...`);
 
-      const response = await callGeminiWithFallback(async (client) =>
-        client.models.generateContent({
-          model: 'gemini-2.5-flash-image-preview',
-          contents: [
-            { role: 'user', parts: [ ...imageParts, ...textParts ] }
-          ],
-          config: {
-            responseModalities: [Modality.IMAGE, Modality.TEXT],
-          },
-        })
-      );
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: [
+          { role: 'user', parts: [ ...imageParts, ...textParts ] }
+        ],
+        config: {
+          responseModalities: [Modality.IMAGE, Modality.TEXT],
+        },
+      });
 
       console.log('[PANEL] Received image response from Gemini API');
       
@@ -418,17 +387,15 @@ Style: A completely wholesome, safe black and white manga panel with screentones
         ];
         
         // Retry with conservative prompt
-        const retryResponse = await callGeminiWithFallback(async (client) =>
-          client.models.generateContent({
-            model: 'gemini-2.5-flash-image-preview',
-            contents: [
-              { role: 'user', parts: [ ...imageParts, ...conservativeTextParts ] }
-            ],
-            config: {
-              responseModalities: [Modality.IMAGE, Modality.TEXT],
-            },
-          })
-        );
+        const retryResponse = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image-preview',
+          contents: [
+            { role: 'user', parts: [ ...imageParts, ...conservativeTextParts ] }
+          ],
+          config: {
+            responseModalities: [Modality.IMAGE, Modality.TEXT],
+          },
+        });
         
         if (retryResponse.candidates?.[0]?.content?.parts) {
           for (const part of retryResponse.candidates[0].content.parts) {
@@ -514,16 +481,14 @@ export const generateCharacterDesigns = async (
   `;
 
   console.log('[CHARACTER] Calling Gemini API for character design generation...');
-  const response = await callGeminiWithFallback(async (client) =>
-    client.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: characterSchema,
-      },
-    })
-  );
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: characterSchema,
+    },
+  });
 
   console.log('[CHARACTER] Received character design response from Gemini API');
   const jsonText = response.text;
