@@ -5,6 +5,7 @@ import Loader from './components/Loader';
 import CharacterImageUploader from './components/CharacterImageUploader';
 import { generateCharacterDesigns, generatePanelImage, generateStoryboard, generateNarration } from './services/geminiService';
 import { elevenLabsService } from './services/elevenlabsService';
+import { motionPosterService } from './services/motionPosterService';
 import type { MangaStripData, Character, InputStrip } from './types';
 import { GenerationState } from './types';
 
@@ -92,7 +93,11 @@ const App: React.FC = () => {
         console.log(`[APP] Processing strip ${i + 1}/${inputStrips.length}: ${strip.description.substring(0, 50)}...`);
         const initialStripData: MangaStripData = {
           description: strip.description,
-          panels: strip.panels.map((p, idx) => ({ ...p, panelNumber: idx + 1 }))
+          panels: strip.panels.map((p, idx) => ({ 
+            ...p, 
+            panelNumber: idx + 1,
+            isFirstPanel: i === 0 && idx === 0 // Only first panel of first strip
+          }))
         };
         stripsToRender.push(initialStripData);
         setGeneratedStrips([...stripsToRender]);
@@ -116,6 +121,24 @@ const App: React.FC = () => {
               finalCharacters: [...finalCharacters]
             });
             throw new Error(`Panel generation failed at strip ${i + 1}, panel ${j + 1}: ${panelError instanceof Error ? panelError.message : 'Unknown error'}`);
+          }
+        }
+
+        // If this is the first panel of the first strip only, preload motion poster
+        if (i === 0) {
+          const firstPanelImageUrl = stripsToRender[i].panels[0].imageUrl;
+          if (firstPanelImageUrl) {
+            console.log(`[APP] Preloading motion poster for first panel of first strip`);
+            motionPosterService.preloadMotionPoster(firstPanelImageUrl).then(() => {
+              const result = motionPosterService.getCachedMotionPoster(firstPanelImageUrl);
+              if (result) {
+                stripsToRender[i].panels[0].motionPosterUrl = result.video_url;
+                setGeneratedStrips([...stripsToRender]);
+                console.log(`[APP] Motion poster preloaded for first panel of first strip`);
+              }
+            }).catch(err => {
+              console.warn(`[APP] Failed to preload motion poster for first panel of first strip:`, err);
+            });
           }
         }
 
