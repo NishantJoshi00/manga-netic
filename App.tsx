@@ -3,11 +3,13 @@ import MangaInput from './components/MangaInput';
 import MangaPage from './components/MangaPage';
 import Loader from './components/Loader';
 import CharacterImageUploader from './components/CharacterImageUploader';
+import ApiKeyInput, { API_KEY_STORAGE } from './components/ApiKeyInput';
 import { generateCharacterDesigns, generatePanelImage, generateStoryboard } from './services/geminiService';
 import type { MangaStripData, Character, InputStrip } from './types';
 import { GenerationState } from './types';
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem(API_KEY_STORAGE) || '');
   const [generationState, setGenerationState] = useState<GenerationState>(GenerationState.INPUT);
   const [chapterText, setChapterText] = useState('');
   const [inputStrips, setInputStrips] = useState<InputStrip[]>([]);
@@ -24,6 +26,10 @@ const App: React.FC = () => {
   } | null>(null);
   
   const isLoading = generationState === GenerationState.GENERATING || generationState === GenerationState.GENERATING_STORYBOARD;
+
+  const handleApiKeySet = (newApiKey: string) => {
+    setApiKey(newApiKey);
+  };
 
   const handleChapterSubmit = useCallback(async (text: string) => {
     console.log('[APP] Chapter submitted, starting storyboard generation');
@@ -188,6 +194,11 @@ const App: React.FC = () => {
   }, [retryContext, inputStrips]);
 
   const renderContent = () => {
+    // Show API key input if no key is set
+    if (!apiKey) {
+      return <ApiKeyInput onApiKeySet={handleApiKeySet} />;
+    }
+
     switch (generationState) {
       case GenerationState.INPUT:
         return <MangaInput onConfirm={handleChapterSubmit} isLoading={false} />;
@@ -245,10 +256,18 @@ const App: React.FC = () => {
   return (
     <div className="bg-white min-h-screen text-gray-900 font-mono">
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <header className="border-b border-gray-300 pb-8 mb-12">
+        <header className="border-b border-gray-300 pb-8 mb-12 flex justify-between items-center">
           <h1 className="text-4xl font-bold text-gray-900 tracking-tight uppercase">
             Manga-netic
           </h1>
+          {apiKey && (
+            <button
+              onClick={() => setApiKey('')}
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 text-xs font-mono uppercase tracking-wide"
+            >
+              Change API Key
+            </button>
+          )}
         </header>
         <main className="space-y-8">
           {renderContent()}

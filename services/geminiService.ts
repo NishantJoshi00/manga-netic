@@ -1,12 +1,18 @@
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import type { Character, CharacterAction, InputStrip, Panel } from '../types';
+import { API_KEY_STORAGE } from '../components/ApiKeyInput';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set");
-}
-
-// Initialize AI client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Get AI client instance with API key from localStorage
+const getAIClient = (): GoogleGenAI => {
+    const apiKey = localStorage.getItem(API_KEY_STORAGE);
+    if (!apiKey) {
+        throw new Error("API key is required. Please set your Gemini API key in the settings.");
+    }
+    if (!apiKey.startsWith('AI')) {
+        throw new Error("Invalid API key format. Gemini API keys start with 'AI'");
+    }
+    return new GoogleGenAI({ apiKey });
+};
 
 const textTypeSchema = {
     type: Type.OBJECT,
@@ -207,6 +213,7 @@ FINAL VERIFICATION REQUIREMENTS:
     
     if (onProgress) {
         // Use streaming for progress updates
+        const ai = getAIClient();
         const stream = await ai.models.generateContentStream({
             model: "gemini-2.5-flash",
             contents: [
@@ -246,6 +253,7 @@ FINAL VERIFICATION REQUIREMENTS:
         }
     } else {
         // Fall back to non-streaming for backward compatibility
+        const ai = getAIClient();
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: [
@@ -347,6 +355,7 @@ GENERATE A COMPLETELY TEXT-FREE MANGA PANEL IMAGE NOW.` }
     try {
       console.log(`[PANEL] Attempt ${attempt}/2 - Calling Gemini API for image generation...`);
 
+      const ai = getAIClient();
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image-preview',
         contents: [
@@ -481,6 +490,7 @@ export const generateCharacterDesigns = async (
   `;
 
   console.log('[CHARACTER] Calling Gemini API for character design generation...');
+  const ai = getAIClient();
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
