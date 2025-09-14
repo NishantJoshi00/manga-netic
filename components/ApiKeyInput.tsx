@@ -106,12 +106,12 @@ const ApiKeyInput: React.FC<ApiKeyInputProps> = ({ onApiKeySet }) => {
       <div className="mt-6 text-xs text-gray-500">
         <p className="mb-2">Get your API key from:</p>
         <a
-          href="https://makersuite.google.com/app/apikey"
+          href="https://aistudio.google.com/apikey"
           target="_blank"
           rel="noopener noreferrer"
           className="text-gray-600 underline font-mono"
         >
-          makersuite.google.com/app/apikey
+          aistudio.google.com/apikey
         </a>
       </div>
     </div>
